@@ -14,6 +14,8 @@ import reactive_demo.handler.UserHandler;
 public class userRouter {
 
     private final UserHandler handler;
+
+
     @Bean
     public RouterFunction<ServerResponse> routerFunction(){
         return RouterFunctions.route()
@@ -21,7 +23,8 @@ public class userRouter {
                 .POST("/",handler::createUser)
                 .GET("/{name}",handler::getByName)
                 .PUT("/update",handler::updateUser)
-                .PUT("/updateByFirstName/{name}",handler::updateByFirstName)
+                .PUT("/updateByFirstName/{name}",handler::updateUserByFirstName)
+                .DELETE("/deleteUserByFirstName/{firstName}",handler::deleteUser)
                 .build();
     }
 }

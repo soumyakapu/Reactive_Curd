@@ -8,4 +8,10 @@ import reactor.core.publisher.Mono;
 @Repository
 public interface UserRepo extends ReactiveMongoRepository<User,String> {
     Mono<User> findByFirstName(String s);
+
+
+
+
+
+
 }

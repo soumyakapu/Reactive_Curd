@@ -1,6 +1,12 @@
 package reactive_demo.handler;
 
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -9,13 +15,16 @@ import reactive_demo.repo.UserRepo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.function.Function;
+import java.util.concurrent.ExecutionException;
+
 
 @Service
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class UserHandler {
-
-    private final UserRepo repo;
+    @Autowired
+    private  UserRepo repo;
+    @Autowired
+    private ReactiveMongoTemplate mongoTemplate;
 
     public Mono<ServerResponse> getAll(ServerRequest request){
         Flux<User> all = repo.findAll();
@@ -35,16 +44,39 @@ public class UserHandler {
         Mono<User> userMono = request.bodyToMono(User.class);
         return ServerResponse.ok().body( userMono.flatMap(repo::save),User.class);
     }
-    public Mono<ServerResponse> updateByFirstName(ServerRequest request){
-        String s = request.pathVariable("name");
-        Mono<User> user = request.bodyToMono(User.class);
-        Mono<User> byFirstName = repo.findByFirstName(s);
-        if((user.map(User::getFirstName)) !=null){
+    public Mono<ServerResponse> updateUserByFirstName(ServerRequest request){
+        String name = request.pathVariable("name");
+        Mono<User> userMono = request.bodyToMono(User.class);
+        Mono<User> userMono1 = repo.findByFirstName(name);
 
-        }
+      return  userMono.flatMap(user -> {
+          if(user.getFirstName() != null){
+              user.setFirstName(userMono.map(User::getFirstName).toString());
 
+          }
+          if(user.getLastName()!= null){
+              user.setLastName(userMono.map(User::getLastName).toString());
+          }
+          if(user.getEmail() != null){
+              user.setEmail(userMono.map(User::getEmail).toString());
+          }
+          if(user.getSalary() <0){
+              try {
+                  user.setSalary(userMono.map(User::getSalary).toFuture().get());
+              } catch (InterruptedException e) {
+                  throw new RuntimeException(e);
+              } catch (ExecutionException e) {
+                  throw new RuntimeException(e);
+              }
+          }
+          return ServerResponse.ok().body( userMono.flatMap(repo::save),User.class);
+        });
 
-        Mono<User> userMono1 = byFirstName.flatMap(userMono -> repo.save(userMono));
-        return ServerResponse.ok().body(userMono1,User.class);
+    }
+    public Mono<ServerResponse> deleteUser(ServerRequest request){
+        String firstName = request.pathVariable("firstName");
+        Query query = new Query().addCriteria(Criteria.where("firstName").is(firstName));
+        Mono<User> andRemove = mongoTemplate.findAndRemove(query, User.class);
+        return ServerResponse.ok().body(andRemove,User.class);
     }
 }
