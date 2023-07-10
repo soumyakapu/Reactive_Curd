@@ -44,35 +44,64 @@ public class UserHandler {
         Mono<User> userMono = request.bodyToMono(User.class);
         return ServerResponse.ok().body( userMono.flatMap(repo::save),User.class);
     }
-    public Mono<ServerResponse> updateUserByFirstName(ServerRequest request){
-        String name = request.pathVariable("name");
-        Mono<User> userMono = request.bodyToMono(User.class);
-        Mono<User> userMono1 = repo.findByFirstName(name);
+//    public Mono<ServerResponse> updateUserByFirstName(ServerRequest request){
+//        String name = request.pathVariable("name");
+//        Mono<User> userMono = request.bodyToMono(User.class);
+//        Mono<User> userMono1 = repo.findByFirstName(name);
+//
+//        return   userMono.flatMap(user -> {
+//          if(user.getFirstName() != null){
+//              user.setFirstName(userMono1.map(User::getFirstName).toString());
+//
+//          }
+//          if(user.getLastName()!= null){
+//              user.setLastName(userMono1.map(User::getLastName).toString());
+//          }
+//          if(user.getEmail() != null){
+//              user.setEmail(userMono1.map(User::getEmail).toString());
+//          }
+//          if(user.getSalary() >0 ){
+//              try {
+//                  user.setSalary(userMono1.map(User::getSalary).toFuture().get());
+//              } catch (InterruptedException e) {
+//                  throw new RuntimeException(e);
+//              } catch (ExecutionException e) {
+//                  throw new RuntimeException(e);
+//              }
+//          }
+//         return repo.save(userMono);
+//        });
+//        return ServerResponse.ok().body( userMono.flatMap(repo::save),User.class);
+//    }
+public Mono<ServerResponse> updateUserByFirstName(ServerRequest request) {
+    String name = request.pathVariable("name");
+    Mono<User> userMono = request.bodyToMono(User.class);
+    Mono<User> existingUserMono = repo.findByFirstName(name);
 
-      return  userMono.flatMap(user -> {
-          if(user.getFirstName() != null){
-              user.setFirstName(userMono.map(User::getFirstName).toString());
+    return userMono.zipWith(existingUserMono)
+            .flatMap(tuple -> {
+                User updatedUser = tuple.getT2();
+                User newUser = tuple.getT1();
 
-          }
-          if(user.getLastName()!= null){
-              user.setLastName(userMono.map(User::getLastName).toString());
-          }
-          if(user.getEmail() != null){
-              user.setEmail(userMono.map(User::getEmail).toString());
-          }
-          if(user.getSalary() <0){
-              try {
-                  user.setSalary(userMono.map(User::getSalary).toFuture().get());
-              } catch (InterruptedException e) {
-                  throw new RuntimeException(e);
-              } catch (ExecutionException e) {
-                  throw new RuntimeException(e);
-              }
-          }
-          return ServerResponse.ok().body( userMono.flatMap(repo::save),User.class);
-        });
+                if (newUser.getFirstName() != null) {
+                    updatedUser.setFirstName(newUser.getFirstName());
+                }
+                if (newUser.getLastName() != null) {
+                    updatedUser.setLastName(newUser.getLastName());
+                }
+                if (newUser.getEmail() != null) {
+                    updatedUser.setEmail(newUser.getEmail());
+                }
+                if (newUser.getSalary() >= 0) {
+                    updatedUser.setSalary(newUser.getSalary());
+                }
 
-    }
+                return repo.save(updatedUser);
+            })
+            .flatMap(savedUser -> ServerResponse.ok().bodyValue(savedUser))
+            .switchIfEmpty(ServerResponse.notFound().build());
+}
+
     public Mono<ServerResponse> deleteUser(ServerRequest request){
         String firstName = request.pathVariable("firstName");
         Query query = new Query().addCriteria(Criteria.where("firstName").is(firstName));
